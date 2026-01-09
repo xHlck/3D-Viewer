@@ -6,89 +6,66 @@
     <title>VTC 800 - Industrial Viewer</title>
     <style>
         :root {
-            --primary: #007bff;
-            --bg-dark: rgba(20, 20, 20, 0.85);
+            --primary: #ff0000; /* Vermelho industrial */
+            --bg-dark: rgba(15, 15, 15, 0.9);
             --text: #ffffff;
         }
 
         body { 
-            margin: 0; 
-            background: radial-gradient(circle, #2a2a2a, #000); 
-            overflow: hidden; 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-            color: var(--text);
+            margin: 0; background: radial-gradient(circle, #2a2a2a, #000); 
+            overflow: hidden; font-family: 'Segoe UI', sans-serif; color: var(--text);
         }
 
         canvas { display: block; }
 
         /* --- INTERFACE UI --- */
         #ui-layer {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* Deixa cliques passarem para o Three.js */
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 20px;
-            box-sizing: border-box;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column;
+            justify-content: space-between; padding: 20px; box-sizing: border-box;
+            z-index: 5;
         }
 
         header {
-            pointer-events: auto;
-            border-left: 4px solid var(--primary);
-            padding-left: 15px;
-            background: linear-gradient(to right, var(--bg-dark), transparent);
+            pointer-events: auto; border-left: 4px solid var(--primary);
+            padding-left: 15px; background: linear-gradient(to right, var(--bg-dark), transparent);
             max-width: fit-content;
         }
+        header h1 { margin: 0; font-size: 1.4rem; letter-spacing: 2px; }
+        header p { margin: 0; font-size: 0.7rem; opacity: 0.7; text-transform: uppercase; }
 
-        header h1 { margin: 0; font-size: 1.5rem; letter-spacing: 2px; }
-        header p { margin: 0; font-size: 0.8rem; opacity: 0.7; text-transform: uppercase; }
-
-        /* Card Rotativo */
         .info-card {
-            pointer-events: auto;
-            background: var(--bg-dark);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            border-radius: 8px;
-            width: 280px;
-            border-bottom: 3px solid var(--primary);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            transition: all 0.5s ease;
+            pointer-events: auto; background: var(--bg-dark);
+            backdrop-filter: blur(10px); padding: 15px; border-radius: 4px;
+            width: 260px; border-bottom: 3px solid var(--primary);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: opacity 0.5s ease;
         }
-
-        .info-card h3 { margin: 0 0 10px 0; color: var(--primary); font-size: 0.9rem; }
+        .info-card h3 { margin: 0 0 5px 0; color: var(--primary); font-size: 0.8rem; letter-spacing: 1px; }
         .info-card p { margin: 0; font-size: 0.85rem; line-height: 1.4; min-height: 3em; }
 
         #loading {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #fff; font-size: 1rem; letter-spacing: 2px;
+            color: #fff; font-size: 1rem; letter-spacing: 2px; z-index: 10;
         }
 
-        /* Ajustes Mobile */
         @media (max-width: 600px) {
-            header h1 { font-size: 1.2rem; }
-            .info-card { width: calc(100% - 40px); margin-bottom: 20px; }
-            .lil-gui { --width: 150px; } /* Diminui o menu no mobile */
+            .info-card { width: calc(100% - 40px); margin-bottom: 10px; }
         }
     </style>
 </head>
 <body>
 
-    <div id="loading">INICIALIZANDO SISTEMA...</div>
+    <div id="loading">SISTEMA INICIALIZANDO...</div>
 
     <div id="ui-layer">
         <header>
             <h1>VTC 800</h1>
-            <p>Industrial Machine Viewer v1.0</p>
+            <p>Industrial Machine Viewer</p>
         </header>
 
         <div class="info-card" id="rotative-card">
-            <h3 id="card-title">STATUS DO SISTEMA</h3>
-            <p id="card-text">Aguardando carregamento do modelo...</p>
+            <h3 id="card-title">STATUS</h3>
+            <p id="card-text">Carregando telemetria...</p>
         </div>
     </div>
 
@@ -108,59 +85,111 @@
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
-        // --- LÓGICA DO CARD ROTATIVO ---
+        // --- CONFIGURAÇÃO DOS CARDS (EDITE AQUI) ---
         const infoData = [
-            { title: "ESPECIFICAÇÕES", text: "Eixo X: 800mm | Eixo Y: 450mm. Alta precisão para usinagem pesada." },
-            { title: "SISTEMA DE CORTE", text: "Spindle de 12.000 RPM com refrigeração interna líquida." },
-            { title: "DIAGNÓSTICO", text: "Sensores térmicos ativos. Operação dentro dos limites nominais." },
-            { title: "MANUTENÇÃO", text: "Próxima revisão preventiva em: 450 horas de operação." }
+            { title: "ESPECIFICAÇÕES", text: "Eixo X: 800mm | Eixo Y: 450mm. Alta precisão industrial." },
+            { title: "SISTEMA DE ALARME", text: "Monitoramento de vibração e temperatura em tempo real." },
+            { title: "MANUTENÇÃO", text: "Status: Operacional. Próxima revisão em 450h." }
         ];
         let infoIndex = 0;
         function rotateInfo() {
             const card = document.getElementById('rotative-card');
-            const title = document.getElementById('card-title');
-            const text = document.getElementById('card-text');
-            
             card.style.opacity = 0;
             setTimeout(() => {
-                title.innerText = infoData[infoIndex].title;
-                text.innerText = infoData[infoIndex].text;
+                document.getElementById('card-title').innerText = infoData[infoIndex].title;
+                document.getElementById('card-text').innerText = infoData[infoIndex].text;
                 card.style.opacity = 1;
                 infoIndex = (infoIndex + 1) % infoData.length;
             }, 500);
         }
-        setInterval(rotateInfo, 5000); // Troca a cada 5 segundos
+        setInterval(rotateInfo, 6000);
 
-        // --- CENA THREE.JS ---
+        // --- CENA ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(5, 3, 5);
+        camera.position.set(6, 4, 6);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Performance em mobile
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         document.body.appendChild(renderer.domElement);
 
+        // Iluminação
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+        dirLight.position.set(5, 10, 5);
+        scene.add(dirLight);
+
+        // --- SISTEMA DE ALARME (REINTEGRADO) ---
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const context = canvas.getContext('2d');
+            const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, 'rgba(255, 0, 0, 1)');
+            gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        const alarmSprite = new THREE.Sprite(new THREE.SpriteMaterial({ 
+            map: createGlowTexture(), color: 0xff0000, transparent: true, opacity: 0, blending: THREE.AdditiveBlending 
+        }));
+        alarmSprite.position.set(0, 3.2, 0);
+        scene.add(alarmSprite);
+
+        const alarmRealLight = new THREE.PointLight(0xff0000, 0, 6);
+        alarmRealLight.position.copy(alarmSprite.position);
+        scene.add(alarmRealLight);
+
+        // --- CONTROLES E ESTADO ---
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // Luzes
-        scene.add(new THREE.AmbientLight(0xffffff, 1.0));
-        const sun = new THREE.DirectionalLight(0xffffff, 2);
-        sun.position.set(5, 10, 7);
-        scene.add(sun);
+        const settings = {
+            rotacao: false,
+            flutuar: false,
+            vistaExplodida: 0,
+            xray: false,
+            wireframe: false,
+            luzAlarme: false,
+            reset: () => {
+                controls.reset();
+                settings.rotacao = false;
+                settings.flutuar = false;
+                settings.vistaExplodida = 0;
+                settings.xray = false;
+                settings.wireframe = false;
+                toggleXRay(false);
+                toggleWireframe(false);
+                if(settings.luzAlarme) toggleAlarm(false);
+                settings.luzAlarme = false;
+                gui.controllers.forEach(c => c.updateDisplay());
+            }
+        };
+
+        const gui = new GUI({ title: 'PAINEL DE CONTROLE' });
+        const f1 = gui.addFolder('Movimentação');
+        f1.add(settings, 'rotacao').name('Rotação Auto');
+        f1.add(settings, 'flutuar').name('Flutuação');
+        f1.add(settings, 'vistaExplodida', 0, 4).name('Explosão');
+
+        const f2 = gui.addFolder('Diagnóstico');
+        f2.add(settings, 'xray').name('Raio-X').onChange(toggleXRay);
+        f2.add(settings, 'wireframe').name('Aramado').onChange(toggleWireframe);
+        f2.add(settings, 'luzAlarme').name('🚨 ALARME').onChange(toggleAlarm);
+        gui.add(settings, 'reset').name('Resetar Visualização');
 
         // --- CARREGAMENTO ---
-        const dracoLoader = new DRACOLoader();
-        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-
-        const loader = new GLTFLoader();
-        loader.setDRACOLoader(dracoLoader);
-
         let model = null;
         let originalPositions = new Map();
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+        const loader = new GLTFLoader();
+        loader.setDRACOLoader(dracoLoader);
 
         loader.load('./VTC800-v1.glb', (gltf) => {
             model = gltf.scene;
@@ -169,56 +198,57 @@
             box.getCenter(center);
             model.position.sub(center);
             scene.add(model);
-            
             document.getElementById('loading').style.display = 'none';
-            rotateInfo(); // Inicia o card após carregar
-
+            
             model.traverse(child => {
                 if (child.isMesh) {
                     originalPositions.set(child.uuid, child.position.clone());
                 }
             });
-        }, undefined, (e) => {
-            console.error(e);
-            document.getElementById('loading').innerText = "ERRO AO CARREGAR";
         });
 
-        // --- GUI CONFIG ---
-        const settings = {
-            rotacao: true,
-            explosao: 0,
-            xray: false,
-            reset: () => {
-                controls.reset();
-                settings.explosao = 0;
-            }
-        };
+        // --- FUNÇÕES DE LÓGICA ---
+        function toggleWireframe(v) {
+            if (model) model.traverse(c => { if(c.isMesh) c.material.wireframe = v; });
+        }
 
-        const gui = new GUI({ title: 'CONTROLES' });
-        gui.add(settings, 'rotacao').name('Giro Automático');
-        gui.add(settings, 'explosao', 0, 3).name('Vista Explodida');
-        gui.add(settings, 'xray').name('Raio-X').onChange(v => {
-            model.traverse(c => {
-                if(c.isMesh && c.material) {
-                    c.material.transparent = v;
-                    c.material.opacity = v ? 0.2 : 1;
-                }
+        function toggleXRay(v) {
+            if (model) model.traverse(c => { 
+                if(c.isMesh) { c.material.transparent = v; c.material.opacity = v ? 0.3 : 1; c.material.depthWrite = !v; }
             });
-        });
+        }
 
-        // --- LOOP ---
+        let alarmInterval = null;
+        function toggleAlarm(v) {
+            if (v) {
+                let active = false;
+                alarmInterval = setInterval(() => {
+                    active = !active;
+                    alarmSprite.material.opacity = active ? 1 : 0.2;
+                    alarmRealLight.intensity = active ? 40 : 0;
+                }, 300);
+            } else {
+                clearInterval(alarmInterval);
+                alarmSprite.material.opacity = 0;
+                alarmRealLight.intensity = 0;
+            }
+        }
+
+        // --- LOOP E EVENTOS ---
         const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
-            
+            const elapsed = clock.getElapsedTime();
+
             if (model) {
-                if (settings.rotacao) model.rotation.y += delta * 0.2;
+                if (settings.rotacao) model.rotation.y += delta * 0.4;
+                if (settings.flutuar) model.position.y = Math.sin(elapsed * 1.5) * 0.15;
                 
                 model.traverse(child => {
                     if (child.isMesh && originalPositions.has(child.uuid)) {
                         const orig = originalPositions.get(child.uuid);
-                        const target = orig.clone().add(orig.clone().normalize().multiplyScalar(settings.explosao));
+                        const target = orig.clone().add(orig.clone().normalize().multiplyScalar(settings.vistaExplodida));
                         child.position.lerp(target, 0.1);
                     }
                 });
@@ -232,6 +262,12 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // Proteção Anti-Inspeção (Reintegrada)
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.onkeydown = e => {
+            if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74 || e.keyCode == 67)) || (e.ctrlKey && e.keyCode == 85)) return false;
+        };
 
         animate();
     </script>
