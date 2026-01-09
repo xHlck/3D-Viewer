@@ -134,7 +134,18 @@
         let originalMaterials = new Map(); // Para salvar texturas antes do Raio-X
         let explosionCenter = new THREE.Vector3();
 
-        const loader = new GLTFLoader();
+		// 1. Criar o carregador Draco
+		const dracoLoader = new THREE.DRACOLoader();
+ 
+		// 2. Apontar para o decodificador (Link oficial do Google)
+		// Isso permite que o navegador descompacte seu arquivo de 2MB
+		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+ 
+		// 3. Configurar o GLTFLoader para usar o Draco
+		const loader = new THREE.GLTFLoader();
+		loader.setDRACOLoader(dracoLoader);
+ 
+        //const loader = new GLTFLoader();
 		const driveID = '1HwXWWPHHelEF93gtFf4dsdziDnz7p9za';
 		const url = `https://docs.google.com/uc?export=download&id=${driveID}`;
  
@@ -281,3 +292,4 @@ document.onkeydown = function(e) {
 </body>
 
 </html>
+
