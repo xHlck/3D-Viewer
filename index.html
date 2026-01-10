@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Industrial 3D Hub</title>
+    <title>Industrial Viewer Pro</title>
     <style>
         :root {
             --primary: #ff0000;
@@ -18,6 +18,7 @@
 
         canvas { display: block; }
 
+        /* --- INTERFACE UI --- */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; display: flex; flex-direction: column;
@@ -25,27 +26,32 @@
             z-index: 5;
         }
 
-        /* --- MENU DE TROCA (SUPERIOR ESQUERDO) --- */
-        #selector-area {
-            pointer-events: auto; background: var(--bg-dark);
-            padding: 15px; border-left: 4px solid var(--primary);
-            border-radius: 0 4px 4px 0;
+        header {
+            pointer-events: auto; border-left: 4px solid var(--primary);
+            padding-left: 15px; background: linear-gradient(to right, var(--bg-dark), transparent);
+            max-width: fit-content;
         }
-        #selector-area label { display: block; font-size: 0.65rem; text-transform: uppercase; margin-bottom: 5px; opacity: 0.7; }
-        select {
-            background: #222; color: #fff; border: 1px solid #444;
-            padding: 10px; border-radius: 4px; cursor: pointer; width: 220px; font-size: 0.9rem;
-        }
+        header h1 { margin: 0; font-size: 1.4rem; letter-spacing: 2px; text-transform: uppercase; }
+        header p { margin: 0; font-size: 0.7rem; opacity: 0.7; text-transform: uppercase; margin-bottom: 10px; }
 
-        /* --- CARD DE INFO (INFERIOR ESQUERDO) --- */
+        /* SELETOR DE MÁQUINA ABAIXO DO TITULO */
+        .selector-wrapper { margin-top: 10px; }
+        select {
+            background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #444;
+            padding: 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;
+            outline: none; transition: border-color 0.3s;
+        }
+        select:hover { border-color: var(--primary); }
+
+        /* CARD ROTATIVO */
         .info-card {
             pointer-events: auto; background: var(--bg-dark);
-            backdrop-filter: blur(10px); padding: 20px; border-radius: 4px;
-            width: 300px; border-bottom: 3px solid var(--primary);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px); padding: 15px; border-radius: 4px;
+            width: 280px; border-bottom: 3px solid var(--primary);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5); transition: opacity 0.5s ease;
         }
-        .info-card h3 { margin: 0 0 8px 0; color: var(--primary); font-size: 0.9rem; letter-spacing: 1px; text-transform: uppercase; }
-        .info-card p { margin: 0; font-size: 0.85rem; line-height: 1.5; opacity: 0.9; }
+        .info-card h3 { margin: 0 0 5px 0; color: var(--primary); font-size: 0.8rem; letter-spacing: 1px; }
+        .info-card p { margin: 0; font-size: 0.85rem; line-height: 1.4; min-height: 3em; }
 
         #loading {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -55,22 +61,24 @@
 </head>
 <body>
 
-    <div id="loading">CARREGANDO SISTEMA...</div>
+    <div id="loading">SISTEMA INICIALIZANDO...</div>
 
     <div id="ui-layer">
-        <div id="selector-area">
-            <label>Selecione o Equipamento</label>
-            <select id="machine-selector">
-                <option value="./VTC800-v1.glb">VFFS VTC 800</option>
-                <option value="./grinder.glb">COMBIgrind 280</option>
-            </select>
-        </div>
-
-        <div class="info-card">
-            <h3 id="card-title">Título do Modelo</h3>
-            <div id="card-content-area">
-                <p id="card-text">Descrição da máquina selecionada...</p>
+        <header>
+            <h1 id="main-title">Embaladora vertical VTC 800</h1>
+            <p>Industrial 3D Machine Viewer</p>
+            
+            <div class="selector-wrapper">
+                <select id="machine-select">
+                    <option value="./VTC800-v1.glb">VFFS VTC 800</option>
+                    <option value="./grinder-v1.glb">COMBIgrind 280</option>
+                </select>
             </div>
+        </header>
+
+        <div class="info-card" id="rotative-card">
+            <h3 id="card-title">STATUS</h3>
+            <p id="card-text">Carregando telemetria...</p>
         </div>
     </div>
 
@@ -88,56 +96,51 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
-        // ================================================================
-        // BANCO DE DADOS DAS MÁQUINAS (EDITE AS INFORMAÇÕES AQUI)
-        // O "id" deve ser exatamente igual ao "value" do <select> acima.
-        // ================================================================
+        // --- BANCO DE DADOS DE INFORMAÇÕES (EDITAR AQUI) ---
         const machineDatabase = {
             "./VTC800-v1.glb": {
-                title: "Embaladora VTC 800",
-                info: [
-                    "Desenho higiênico com fácil troca de formato.",
-                    "Embalamento contínuo em altas velocidades.",
-                    "Controle via PC Industrial Touch Screen 10\"."
+                name: "Embaladora vertical VTC 800",
+                cards: [
+                    { title: "SOBRE A MÁQUINA", text: "Máquina embaladora vertical (VFFS) de desenho higiênico com fácil troca de formato." },
+                    { title: "CONTROLE", text: "Controle através de PC Industrial tela touch screen 10\"." },
+                    { title: "MANUTENÇÃO", text: "Baixo custo de manutenção e total acessibilidade para ajustes." }
                 ]
             },
             "./grinder.glb": {
-                title: "COMBIgrind 280",
-                info: [
-                    "Moedor industrial de alto desempenho para blocos congelados.",
-                    "Capacidade de processamento de até 6000kg/h.",
-                    "Construção em aço inox AISI 316 com foco em sanitização."
+                name: "COMBIgrind 280",
+                cards: [
+                    { title: "ALTO DESEMPENHO", text: "Moedor industrial para blocos congelados e carne fresca." },
+                    { title: "CAPACIDADE", text: "Processamento contínuo de até 6.000 kg/h com máxima eficiência." },
+                    { title: "SANITIZAÇÃO", text: "Construção em aço inox AISI 304, atendendo normas globais de higiene." }
                 ]
             }
         };
 
-        // --- LÓGICA DO CARD ROTATIVO POR MÁQUINA ---
-        let currentInfoIndex = 0;
+        // --- LÓGICA DE ROTAÇÃO DOS CARDS ---
+        let infoIndex = 0;
         let infoInterval = null;
-
-        function startInfoRotation(machineId) {
-            if (infoInterval) clearInterval(infoInterval);
-            const data = machineDatabase[machineId];
+        function startCardRotation(modelPath) {
+            if(infoInterval) clearInterval(infoInterval);
+            const data = machineDatabase[modelPath].cards;
             
-            const updateText = () => {
-                const textElement = document.getElementById('card-text');
-                document.getElementById('card-title').innerText = data.title;
-                textElement.style.opacity = 0;
-                
+            const rotate = () => {
+                const card = document.getElementById('rotative-card');
+                card.style.opacity = 0;
                 setTimeout(() => {
-                    textElement.innerText = data.info[currentInfoIndex];
-                    textElement.style.opacity = 1;
-                    currentInfoIndex = (currentInfoIndex + 1) % data.info.length;
+                    document.getElementById('card-title').innerText = data[infoIndex].title;
+                    document.getElementById('card-text').innerText = data[infoIndex].text;
+                    card.style.opacity = 1;
+                    infoIndex = (infoIndex + 1) % data.length;
                 }, 500);
             };
-
-            currentInfoIndex = 0;
-            updateText();
-            infoInterval = setInterval(updateText, 6000);
+            infoIndex = 0;
+            rotate();
+            infoInterval = setInterval(rotate, 6000);
         }
 
-        // --- CENA THREE.JS ---
+        // --- SETUP DA CENA ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(6, 4, 6);
@@ -145,59 +148,132 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
         document.body.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-        const light = new THREE.DirectionalLight(0xffffff, 2);
-        light.position.set(5, 10, 5);
-        scene.add(light);
+        scene.add(new THREE.AmbientLight(0xffffff, 1.2));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+        dirLight.position.set(5, 10, 5);
+        scene.add(dirLight);
+
+        // --- SISTEMA DE ALARME ---
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            grad.addColorStop(0, 'rgba(255, 0, 0, 1)');
+            grad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, 32, 32);
+            return new THREE.CanvasTexture(canvas);
+        }
+        const alarmSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: createGlowTexture(), color: 0xff0000, transparent: true, opacity: 0, blending: THREE.AdditiveBlending }));
+        alarmSprite.position.set(0, 3.2, 0);
+        scene.add(alarmSprite);
+        const alarmRealLight = new THREE.PointLight(0xff0000, 0, 6);
+        alarmRealLight.position.copy(alarmSprite.position);
+        scene.add(alarmRealLight);
 
         // --- CARREGAMENTO ---
         let model = null;
+        let originalPositions = new Map();
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
         const loader = new GLTFLoader();
-        const draco = new DRACOLoader();
-        draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-        loader.setDRACOLoader(draco);
+        loader.setDRACOLoader(dracoLoader);
 
-        function loadMachine(url) {
+        function loadMachine(path) {
             document.getElementById('loading').style.display = 'block';
-            if (model) scene.remove(model);
+            if(model) scene.remove(model);
 
-            loader.load(url, (gltf) => {
+            loader.load(path, (gltf) => {
                 model = gltf.scene;
-                // Centralização automática
                 const box = new THREE.Box3().setFromObject(model);
                 const center = new THREE.Vector3();
                 box.getCenter(center);
                 model.position.sub(center);
-                
                 scene.add(model);
                 document.getElementById('loading').style.display = 'none';
-                startInfoRotation(url);
+                
+                // Atualiza Título e Cards
+                document.getElementById('main-title').innerText = machineDatabase[path].name;
+                startCardRotation(path);
+
+                originalPositions.clear();
+                model.traverse(child => {
+                    if (child.isMesh) originalPositions.set(child.uuid, child.position.clone());
+                });
             });
         }
 
-        // --- EVENTOS ---
-        document.getElementById('machine-selector').addEventListener('change', (e) => {
-            loadMachine(e.target.value);
-        });
+        // --- CONTROLES GUI ---
+        const settings = {
+            rotacao: false, flutuar: false, vistaExplodida: 0, xray: false, wireframe: false, luzAlarme: false,
+            reset: () => {
+                controls.reset(); settings.rotacao = false; settings.flutuar = false; settings.vistaExplodida = 0;
+                settings.xray = false; settings.wireframe = false; settings.luzAlarme = false;
+                if (model) model.traverse(c => { if(c.isMesh) { c.material.transparent = false; c.material.opacity = 1; c.material.wireframe = false; }});
+                toggleAlarm(false); gui.controllers.forEach(c => c.updateDisplay());
+            }
+        };
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        const gui = new GUI({ title: 'PAINEL DE CONTROLE' });
+        const f1 = gui.addFolder('Movimentação');
+        f1.add(settings, 'rotacao').name('Rotação Auto');
+        f1.add(settings, 'flutuar').name('Flutuação');
+        f1.add(settings, 'vistaExplodida', 0, 4).name('Explosão');
+        const f2 = gui.addFolder('Diagnóstico');
+        f2.add(settings, 'xray').name('Raio-X').onChange(v => { if(model) model.traverse(c => { if(c.isMesh) { c.material.transparent = v; c.material.opacity = v ? 0.3 : 1; } })});
+        f2.add(settings, 'wireframe').name('Aramado').onChange(v => { if(model) model.traverse(c => { if(c.isMesh) c.material.wireframe = v; })});
+        f2.add(settings, 'luzAlarme').name('🚨 ALARME').onChange(toggleAlarm);
+        gui.add(settings, 'reset').name('Resetar Visualização');
 
+        let alarmInterval = null;
+        function toggleAlarm(v) {
+            if (v) {
+                let active = false;
+                alarmInterval = setInterval(() => { active = !active; alarmSprite.material.opacity = active ? 1 : 0.2; alarmRealLight.intensity = active ? 40 : 0; }, 300);
+            } else {
+                clearInterval(alarmInterval); alarmSprite.material.opacity = 0; alarmRealLight.intensity = 0;
+            }
+        }
+
+        // --- LOOP ---
+        const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const elapsed = clock.getElapsedTime();
+
+            if (model) {
+                if (settings.rotacao) model.rotation.y += delta * 0.4;
+                if (settings.flutuar) model.position.y = Math.sin(elapsed * 1.5) * 0.15;
+                model.traverse(child => {
+                    if (child.isMesh && originalPositions.has(child.uuid)) {
+                        const orig = originalPositions.get(child.uuid);
+                        const target = orig.clone().add(orig.clone().normalize().multiplyScalar(settings.vistaExplodida));
+                        child.position.lerp(target, 0.1);
+                    }
+                });
+            }
             controls.update();
             renderer.render(scene, camera);
         }
 
-        // Inicialização
+        // Eventos
+        document.getElementById('machine-select').addEventListener('change', (e) => loadMachine(e.target.value));
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Anti-Inspeção
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.onkeydown = e => { if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74 || e.keyCode == 67)) || (e.ctrlKey && e.keyCode == 85)) return false; };
+
         loadMachine('./VTC800-v1.glb');
         animate();
     </script>
