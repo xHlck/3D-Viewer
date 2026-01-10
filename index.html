@@ -53,6 +53,12 @@
         .info-card h3 { margin: 0 0 5px 0; color: var(--primary); font-size: 0.8rem; letter-spacing: 1px; }
         .info-card p { margin: 0; font-size: 0.85rem; line-height: 1.4; min-height: 3em; }
 
+        /* FPS MONITOR */
+        #stats-container {
+            position: absolute; top: 10px; right: 20px; z-index: 100;
+            pointer-events: none;
+        }
+
         #loading {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             color: #fff; font-size: 1rem; letter-spacing: 2px; z-index: 10;
@@ -62,6 +68,7 @@
 <body>
 
     <div id="loading">SISTEMA INICIALIZANDO...</div>
+    <div id="stats-container"></div>
 
     <div id="ui-layer">
         <header>
@@ -71,7 +78,7 @@
             <div class="selector-wrapper">
                 <select id="machine-select">
                     <option value="./VTC800-v1.glb">VFFS VTC 800</option>
-                    <option value="./grinder-v1.glb">COMBIgrind 280</option>
+                    <option value="./grinder.glb">COMBIgrind 280</option>
                 </select>
             </div>
         </header>
@@ -97,6 +104,7 @@
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+        import Stats from 'three/addons/libs/stats.module.js';
 
         // --- BANCO DE DADOS DE INFORMAÇÕES (EDITAR AQUI) ---
         const machineDatabase = {
@@ -117,6 +125,12 @@
                 ]
             }
         };
+
+        // --- MONITOR DE FPS ---
+        const stats = new Stats();
+        stats.showPanel(0); // 0: FPS
+        document.getElementById('stats-container').appendChild(stats.dom);
+        stats.dom.style.position = 'relative';
 
         // --- LÓGICA DE ROTAÇÃO DOS CARDS ---
         let infoIndex = 0;
@@ -198,7 +212,6 @@
                 scene.add(model);
                 document.getElementById('loading').style.display = 'none';
                 
-                // Atualiza Título e Cards
                 document.getElementById('main-title').innerText = machineDatabase[path].name;
                 startCardRotation(path);
 
@@ -221,14 +234,18 @@
         };
 
         const gui = new GUI({ title: 'PAINEL DE CONTROLE' });
+        gui.domElement.style.marginTop = "60px"; // Ajuste para o FPS não cobrir
+        
         const f1 = gui.addFolder('Movimentação');
         f1.add(settings, 'rotacao').name('Rotação Auto');
         f1.add(settings, 'flutuar').name('Flutuação');
         f1.add(settings, 'vistaExplodida', 0, 4).name('Explosão');
+        
         const f2 = gui.addFolder('Diagnóstico');
         f2.add(settings, 'xray').name('Raio-X').onChange(v => { if(model) model.traverse(c => { if(c.isMesh) { c.material.transparent = v; c.material.opacity = v ? 0.3 : 1; } })});
         f2.add(settings, 'wireframe').name('Aramado').onChange(v => { if(model) model.traverse(c => { if(c.isMesh) c.material.wireframe = v; })});
         f2.add(settings, 'luzAlarme').name('🚨 ALARME').onChange(toggleAlarm);
+        
         gui.add(settings, 'reset').name('Resetar Visualização');
 
         let alarmInterval = null;
@@ -241,9 +258,11 @@
             }
         }
 
-        // --- LOOP ---
+        // --- LOOP PRINCIPAL ---
         const clock = new THREE.Clock();
         function animate() {
+            stats.begin(); // Medição FPS
+            
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
             const elapsed = clock.getElapsedTime();
@@ -261,6 +280,8 @@
             }
             controls.update();
             renderer.render(scene, camera);
+            
+            stats.end(); // Medição FPS
         }
 
         // Eventos
@@ -270,7 +291,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Anti-Inspeção
+        // Proteção
         document.addEventListener('contextmenu', e => e.preventDefault());
         document.onkeydown = e => { if(e.keyCode == 123 || (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74 || e.keyCode == 67)) || (e.ctrlKey && e.keyCode == 85)) return false; };
 
